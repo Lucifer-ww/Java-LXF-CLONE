@@ -12,16 +12,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Writer;
-import java.lang.ProcessBuilder.Redirect;
-import java.math.BigInteger;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
-import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -37,7 +36,7 @@ import com.sun.net.httpserver.HttpsParameters;
 import com.sun.net.httpserver.HttpsServer;
 
 /**
- * A simple https server.
+ * A simple https server for running java code.
  * 
  * @author liaoxuefeng
  */
@@ -52,7 +51,7 @@ public class Main {
 		TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
 		tmf.init(keystore);
 		// create https server
-		HttpsServer server = HttpsServer.create(new InetSocketAddress(9443), 0);
+		HttpsServer server = HttpsServer.create(new InetSocketAddress(39193), 0);
 		// create ssl context
 		SSLContext sslContext = SSLContext.getInstance("SSL");
 		// setup the HTTPS context and parameters
@@ -74,49 +73,108 @@ public class Main {
 			}
 		});
 		server.createContext("/", new CodeHandler());
-		// server.start();
-		System.out.println("server is ready for https://local.liaoxuefeng.com:9443/");
-		ProcessResult pr = runJavaProgram(
-				"public class Main { public static void main(String[]args){System.out.println(\"Helloworld\");}}");
-		System.out.println(pr.output);
+		server.start();
+		System.out.println("server is ready for https://local.liaoxuefeng.com:39193/");
 	}
 
 	static ProcessResult runJavaProgram(String code) throws IOException, InterruptedException {
-		String javaHome = System.getProperty("java.home");
 		String tmpDir = System.getProperty("java.io.tmpdir");
-		String dirName = String.format("%016x", nextLong.incrementAndGet());
-		Path javaPath = Paths.get(javaHome, "bin", "java");
-		Path pwdPath = Paths.get(tmpDir, dirName);
-		pwdPath.toFile().mkdirs();
-		try (Writer writer = new BufferedWriter(new FileWriter(new File(pwdPath.toFile(), "Main.java")))) {
+		File pwd = Paths.get(tmpDir, String.format("%016x", nextLong.incrementAndGet())).toFile();
+		pwd.mkdirs();
+		try (Writer writer = new BufferedWriter(new FileWriter(new File(pwd, "Main.java")))) {
 			writer.write(code);
 		}
-		ProcessBuilder pb = new ProcessBuilder().command(javaPath.toString(), "Main.java").directory(pwdPath.toFile());
+		String[] command = new String[] { getJavaExecutePath(), "-Dfile.encoding=UTF-8", "Main.java" };
+		System.out.println(String.format("cd %s\n%s", pwd.toString(), String.join(" ", command)));
+		ProcessBuilder pb = new ProcessBuilder().command(command).directory(pwd);
 		pb.redirectErrorStream(true);
 		Process p = pb.start();
 		if (p.waitFor(5, TimeUnit.SECONDS)) {
-			ByteArrayOutputStream output = new ByteArrayOutputStream();
-			byte[] buffer = new byte[102400];
+			String result = null;
 			try (InputStream input = p.getInputStream()) {
-				for (;;) {
-					int n = input.read(buffer);
-					if (n == (-1)) {
-						break;
-					}
-					output.write(buffer, 0, n);
-				}
+				result = readAsString(input);
 			}
-			String result = output.toString(StandardCharsets.UTF_8);
 			return new ProcessResult(p.exitValue(), result);
 		} else {
+			System.err.println(String.format("Error: process %s timeout. destroy forcibly.", p.pid()));
 			p.destroyForcibly();
 			return new ProcessResult(p.exitValue(), "Timeout.");
 		}
 	}
 
-	static String encodeJson(String s) {
+	static class CodeHandler implements HttpHandler {
+		@Override
+		public void handle(HttpExchange exchange) throws IOException {
+			String method = exchange.getRequestMethod();
+			if ("GET".equals(method)) {
+				sendResult(exchange, 0, "Server is ready.");
+			} else {
+				String body = readAsString(exchange.getRequestBody());
+				if (!body.startsWith("code=")) {
+					sendResult(exchange, 1, "No code found.");
+				} else {
+					String code = URLDecoder.decode(body.substring(5), StandardCharsets.UTF_8);
+					System.out.println("========== prepare running code ==========");
+					System.out.println(code);
+					System.out.println("==========================================");
+					try {
+						ProcessResult result = runJavaProgram(code);
+						System.out.println("================= result =================");
+						System.out.println("exit code: " + result.exitCode);
+						System.out.println(result.output);
+						System.out.println("==========================================");
+						sendResult(exchange, result.exitCode, result.output);
+					} catch (InterruptedException e) {
+						sendResult(exchange, 1, e.toString());
+					}
+				}
+			}
+		}
+
+		void sendResult(HttpExchange exchange, int exitCode, String output) throws IOException {
+			sendData(exchange,
+					String.format("{\"exitCode\":%s,\"output\":\"%s\"}", exitCode, encodeJsonString(output)));
+		}
+
+		void sendData(HttpExchange exchange, String s) throws IOException {
+			String origin = exchange.getRequestHeaders().getOrDefault("Origin", List.of("https://www.liaoxuefeng.com"))
+					.get(0);
+			exchange.getResponseHeaders().set("Content-Type", "application/json");
+			exchange.getResponseHeaders().set("Access-Control-Allow-Origin", origin);
+			exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET,POST");
+			exchange.getResponseHeaders().set("Access-Control-Max-Age", "86400");
+			exchange.sendResponseHeaders(200, 0);
+			OutputStream os = exchange.getResponseBody();
+			os.write(s.getBytes(StandardCharsets.UTF_8));
+			os.close();
+		}
+	}
+
+	static class ProcessResult {
+		int exitCode;
+		String output;
+
+		public ProcessResult(int exitCode, String output) {
+			this.exitCode = exitCode;
+			this.output = output;
+		}
+	}
+
+	static String readAsString(InputStream input) throws IOException {
+		ByteArrayOutputStream output = new ByteArrayOutputStream();
+		byte[] buffer = new byte[102400];
+		for (;;) {
+			int n = input.read(buffer);
+			if (n == (-1)) {
+				break;
+			}
+			output.write(buffer, 0, n);
+		}
+		return output.toString(StandardCharsets.UTF_8);
+	}
+
+	static String encodeJsonString(String s) {
 		StringBuilder sb = new StringBuilder(s.length() + 1024);
-		sb.append('\"');
 		for (int i = 0; i < s.length(); i++) {
 			char ch = s.charAt(i);
 			switch (ch) {
@@ -149,39 +207,21 @@ public class Main {
 				break;
 			}
 		}
-		sb.append('\"');
 		return sb.toString();
 	}
 
-	static class CodeHandler implements HttpHandler {
-		@Override
-		public void handle(HttpExchange exchange) throws IOException {
-			String method = exchange.getRequestMethod();
-			if ("GET".equals(method)) {
-				sendData(exchange, 200, "Server is ready!");
-			} else {
-				sendData(exchange, 400, "Bad request");
-			}
+	static String getJavaExecutePath() {
+		if (javaExec == null) {
+			String javaHome = System.getProperty("java.home");
+			String os = System.getProperty("os.name");
+			boolean isWindows = os.toLowerCase().startsWith("windows");
+			Path javaPath = Paths.get(javaHome, "bin", isWindows ? "java.exe" : "java");
+			javaExec = javaPath.toString();
 		}
-
-		void sendData(HttpExchange exchange, int code, String s) throws IOException {
-			byte[] data = s.getBytes(StandardCharsets.UTF_8);
-			exchange.sendResponseHeaders(200, data.length);
-			OutputStream os = exchange.getResponseBody();
-			os.write(data);
-			os.close();
-		}
+		return javaExec;
 	}
 
-	static class ProcessResult {
-		int exitCode;
-		String output;
-
-		public ProcessResult(int exitCode, String output) {
-			this.exitCode = exitCode;
-			this.output = output;
-		}
-	}
+	static String javaExec = null;
 
 	static AtomicLong nextLong = new AtomicLong(System.currentTimeMillis());
 
