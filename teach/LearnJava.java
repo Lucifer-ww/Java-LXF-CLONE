@@ -40,7 +40,7 @@ import com.sun.net.httpserver.HttpsServer;
  * 
  * @author liaoxuefeng
  */
-public class Main {
+public class LearnJava {
 
 	public static void main(String[] args) throws IOException, GeneralSecurityException, InterruptedException {
 		KeyStore keystore = KeyStore.getInstance("JKS");
