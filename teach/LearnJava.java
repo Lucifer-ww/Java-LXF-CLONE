@@ -74,7 +74,7 @@ public class LearnJava {
 		});
 		server.createContext("/", new CodeHandler());
 		server.start();
-		System.out.println("server is ready for https://local.liaoxuefeng.com:39193/");
+		System.out.println("Ready for Java code on port 39193...\nPress Ctrl + C to exit...");
 	}
 
 	static ProcessResult runJavaProgram(String code) throws IOException, InterruptedException {
