@@ -132,6 +132,9 @@ public class LearnJava {
 		}
 
 		void sendResult(HttpExchange exchange, int exitCode, String output) throws IOException {
+			if (output.isEmpty()) {
+				output = "(no output)";
+			}
 			sendData(exchange,
 					String.format("{\"exitCode\":%s,\"output\":\"%s\"}", exitCode, encodeJsonString(output)));
 		}
