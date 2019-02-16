@@ -38,6 +38,8 @@ import com.sun.net.httpserver.HttpsServer;
 /**
  * A simple https server for running java code.
  * 
+ * For more information please visit https://www.liaoxuefeng.com/
+ * 
  * @author liaoxuefeng
  */
 public class LearnJava {
