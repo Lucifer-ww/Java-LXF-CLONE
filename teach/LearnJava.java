@@ -205,7 +205,7 @@ public class LearnJava {
 				sb.append("\\r");
 				break;
 			case '\t':
-				sb.append("\\t");
+				sb.append("    ");
 				break;
 			default:
 				sb.append(ch);
