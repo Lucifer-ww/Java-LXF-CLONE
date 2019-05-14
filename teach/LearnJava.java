@@ -14,6 +14,7 @@ import java.io.OutputStream;
 import java.io.Writer;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -83,10 +84,10 @@ public class LearnJava {
 		String tmpDir = System.getProperty("java.io.tmpdir");
 		File pwd = Paths.get(tmpDir, String.format("%016x", nextLong.incrementAndGet())).toFile();
 		pwd.mkdirs();
-		try (Writer writer = new BufferedWriter(new FileWriter(new File(pwd, "Main.java")))) {
+		try (Writer writer = new BufferedWriter(new FileWriter(new File(pwd, "Main.java"), Charset.defaultCharset()))) {
 			writer.write(code);
 		}
-		String[] command = new String[] { getJavaExecutePath(), "--source", "12", "--enable-preview", "-Dfile.encoding=UTF-8", "Main.java" };
+		String[] command = new String[] { getJavaExecutePath(), "--source", "12", "--enable-preview", "Main.java" };
 		System.out.println(String.format("cd %s\n%s", pwd.toString(), String.join(" ", command)));
 		ProcessBuilder pb = new ProcessBuilder().command(command).directory(pwd);
 		pb.redirectErrorStream(true);
