@@ -95,7 +95,7 @@ public class LearnJava {
 		if (p.waitFor(5, TimeUnit.SECONDS)) {
 			String result = null;
 			try (InputStream input = p.getInputStream()) {
-				result = readAsString(input);
+				result = readAsString(input, Charset.defaultCharset());
 			}
 			return new ProcessResult(p.exitValue(), result);
 		} else {
@@ -112,7 +112,7 @@ public class LearnJava {
 			if ("GET".equals(method)) {
 				sendResult(exchange, 0, "Server is ready.");
 			} else {
-				String body = readAsString(exchange.getRequestBody());
+				String body = readAsString(exchange.getRequestBody(), StandardCharsets.UTF_8);
 				if (!body.startsWith("code=")) {
 					sendResult(exchange, 1, "No code found.");
 				} else {
@@ -166,7 +166,7 @@ public class LearnJava {
 		}
 	}
 
-	static String readAsString(InputStream input) throws IOException {
+	static String readAsString(InputStream input, Charset charset) throws IOException {
 		ByteArrayOutputStream output = new ByteArrayOutputStream();
 		byte[] buffer = new byte[102400];
 		for (;;) {
@@ -176,7 +176,7 @@ public class LearnJava {
 			}
 			output.write(buffer, 0, n);
 		}
-		return output.toString(StandardCharsets.UTF_8);
+		return output.toString(charset);
 	}
 
 	static String encodeJsonString(String s) {
