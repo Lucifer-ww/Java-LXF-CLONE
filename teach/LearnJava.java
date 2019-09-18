@@ -87,7 +87,7 @@ public class LearnJava {
 		try (Writer writer = new BufferedWriter(new FileWriter(new File(pwd, "Main.java"), Charset.defaultCharset()))) {
 			writer.write(code);
 		}
-		String[] command = new String[] { getJavaExecutePath(), "--source", "12", "--enable-preview", "Main.java" };
+		String[] command = new String[] { getJavaExecutePath(), "--source", "13", "--enable-preview", "Main.java" };
 		System.out.println(String.format("cd %s\n%s", pwd.toString(), String.join(" ", command)));
 		ProcessBuilder pb = new ProcessBuilder().command(command).directory(pwd);
 		pb.redirectErrorStream(true);
