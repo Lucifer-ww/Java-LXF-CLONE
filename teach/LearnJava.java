@@ -1,4 +1,3 @@
-
 /**
  * default package
  */
@@ -45,7 +44,14 @@ import com.sun.net.httpserver.HttpsServer;
  */
 public class LearnJava {
 
+	static final String VERSION = "14";
+
 	public static void main(String[] args) throws IOException, GeneralSecurityException, InterruptedException {
+		String ver = System.getProperty("java.version");
+		if (!ver.startsWith(VERSION) && !ver.startsWith(VERSION + ".")) {
+			System.err.println("ERROR: cannot start LearnJava because expected Java " + VERSION + " but actual Java " + ver + ".\nPlease update your JDK to " + VERSION + ".");
+			return;
+		}
 		KeyStore keystore = KeyStore.getInstance("JKS");
 		keystore.load(new ByteArrayInputStream(Base64.getDecoder().decode(KEYSTORE_DATA)), KEYSTORE_PASSWD);
 		KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
@@ -87,7 +93,7 @@ public class LearnJava {
 		try (Writer writer = new BufferedWriter(new FileWriter(new File(pwd, "Main.java"), Charset.defaultCharset()))) {
 			writer.write(code);
 		}
-		String[] command = new String[] { getJavaExecutePath(), "--source", "13", "--enable-preview", "Main.java" };
+		String[] command = new String[] { getJavaExecutePath(), "--source", VERSION, "--enable-preview", "Main.java" };
 		System.out.println(String.format("cd %s\n%s", pwd.toString(), String.join(" ", command)));
 		ProcessBuilder pb = new ProcessBuilder().command(command).directory(pwd);
 		pb.redirectErrorStream(true);
